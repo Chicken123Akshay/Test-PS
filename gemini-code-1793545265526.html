@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GameZone SaaS — Simple Slot Booking Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Optional: Paste Supabase URL & Anon Key here, or use the "DB Config" button in the top bar
+    const DEFAULT_SUPABASE_URL = "";
+    const DEFAULT_SUPABASE_ANON_KEY = "";
+
+    const INITIAL_DATA = {
+      zones: [
+        {
+          id: "zone-1",
+          name: "Apex Console Lounge",
+          slug: "apex-lounge",
+          description: "PS5 4K Booths, Gaming PCs & VR Stations",
+          address: "Main Road, Vasai West",
+          city: "Vasai-Virar",
+          mobile_number: "+91 9876543210",
+          map_link: "https://www.openstreetmap.org/?mlat=19.3665&mlon=72.8158#map=16/19.3665/72.8158",
+          upi_id: "apexgaming@okaxis",
+          opening_time: "10:00 AM",
+          closing_time: "11:00 PM",
+          plan_tier: "Professional",
+          subscription_price: 1499,
+          is_active: true
+        },
+        {
+          id: "zone-2",
+          name: "Nexus Gaming Arena",
+          slug: "nexus-arena",
+          description: "Next-Gen Console & PC Bootcamp",
+          address: "Link Road, Andheri West",
+          city: "Mumbai",
+          mobile_number: "+91 9811122233",
+          map_link: "https://www.openstreetmap.org",
+          upi_id: "nexusarena@ybl",
+          opening_time: "11:00 AM",
+          closing_time: "12:00 AM",
+          plan_tier: "Starter",
+          subscription_price: 799,
+          is_active: true
+        }
+      ],
+      resources: [
+        { id: "res-1", game_zone_id: "zone-1", name: "PlayStation 5", category: "Console", hourly_price: 150, is_active: true },
+        { id: "res-2", game_zone_id: "zone-1", name: "Gaming PC (RTX 4070)", category: "PC", hourly_price: 100, is_active: true },
+        { id: "res-3", game_zone_id: "zone-1", name: "VR Station", category: "VR", hourly_price: 250, is_active: true },
+        { id: "res-4", game_zone_id: "zone-2", name: "PlayStation 5", category: "Console", hourly_price: 180, is_active: true }
+      ],
+      consoles: [
+        { id: "c-1", game_zone_id: "zone-1", resource_id: "res-1", unit_name: "PS5 #1", status: "available" },
+        { id: "c-2", game_zone_id: "zone-1", resource_id: "res-1", unit_name: "PS5 #2", status: "available" },
+        { id: "c-3", game_zone_id: "zone-1", resource_id: "res-1", unit_name: "PS5 #3", status: "available" },
+        { id: "c-4", game_zone_id: "zone-1", resource_id: "res-1", unit_name: "PS5 #4", status: "maintenance" },
+        { id: "c-5", game_zone_id: "zone-1", resource_id: "res-2", unit_name: "PC #1", status: "available" },
+        { id: "c-6", game_zone_id: "zone-1", resource_id: "res-2", unit_name: "PC #2", status: "available" },
+        { id: "c-7", game_zone_id: "zone-1", resource_id: "res-2", unit_name: "PC #3", status: "available" },
+        { id: "c-8", game_zone_id: "zone-1", resource_id: "res-2", unit_name: "PC #4", status: "available" },
+        { id: "c-9", game_zone_id: "zone-1", resource_id: "res-3", unit_name: "VR #1", status: "available" },
+        { id: "c-10", game_zone_id: "zone-1", resource_id: "res-3", unit_name: "VR #2", status: "available" },
+        { id: "c-11", game_zone_id: "zone-2", resource_id: "res-4", unit_name: "PS5 #1", status: "available" },
+        { id: "c-12", game_zone_id: "zone-2", resource_id: "res-4", unit_name: "PS5 #2", status: "available" }
+      ],
+      slots: [
+        { id: "s-1", game_zone_id: "zone-1", label: "04:00 PM - 05:00 PM", duration_minutes: 60, is_blocked: false },
+        { id: "s-2", game_zone_id: "zone-1", label: "05:00 PM - 06:00 PM", duration_minutes: 60, is_blocked: false },
+        { id: "s-3", game_zone_id: "zone-1", label: "06:00 PM - 07:00 PM", duration_minutes: 60, is_blocked: false },
+        { id: "s-4", game_zone_id: "zone-1", label: "07:00 PM - 08:00 PM", duration_minutes: 60, is_blocked: false },
+        { id: "s-5", game_zone_id: "zone-1", label: "08:00 PM - 09:00 PM", duration_minutes: 60, is_blocked: true },
+        { id: "s-6", game_zone_id: "zone-2", label: "05:00 PM - 06:00 PM", duration_minutes: 60, is_blocked: false },
+        { id: "s-7", game_zone_id: "zone-2", label: "06:00 PM - 07:00 PM", duration_minutes: 60, is_blocked: false }
+      ],
+      bookings: [
+        {
+          id: "bk-101",
+          booking_ref: "BK-8921",
+          game_zone_id: "zone-1",
+          resource_id: "res-1",
+          resource_name: "PlayStation 5",
+          slot_label: "05:00 PM - 06:00 PM",
+          booking_date: new Date().toISOString().split("T")[0],
+          quantity: 2,
+          total_amount: 300,
+          customer_name: "Rohan Patil",
+          customer_phone: "9822334455",
+          customer_notes: "2 Controllers",
+          status: "confirmed"
+        },
+        {
+          id: "bk-102",
+          booking_ref: "BK-9044",
+          game_zone_id: "zone-1",
+          resource_id: "res-1",
+          resource_name: "PlayStation 5",
+          slot_label: "05:00 PM - 06:00 PM",
+          booking_date: new Date().toISOString().split("T")[0],
+          quantity: 1,
+          total_amount: 150,
+          customer_name: "Siddharth Desai",
+          customer_phone: "9833445566",
+          customer_notes: "",
+          status: "pending"
+        }
+      ],
+      waitlist: [
+        {
+          id: "wl-1",
+          game_zone_id: "zone-1",
+          resource_name: "PlayStation 5",
+          slot_label: "05:00 PM - 06:00 PM",
+          target_date: new Date().toISOString().split("T")[0],
+          customer_name: "Aman Verma",
+          customer_phone: "9766554433",
+          queue_position: 1,
+          status: "waiting"
+        }
+      ]
+    };
+
+    function App() {
+      const todayStr = new Date().toISOString().split("T")[0];
+
+      const [darkMode, setDarkMode] = useState(true);
+      useEffect(() => {
+        if (darkMode) document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      }, [darkMode]);
+
+      const [portal, setPortal] = useState("customer");
+
+      const [appData, setAppData] = useState(() => {
+        const saved = localStorage.getItem("gz_simple_saas_v2");
+        return saved ? JSON.parse(saved) : INITIAL_DATA;
+      });
+
+      useEffect(() => {
+        localStorage.setItem("gz_simple_saas_v2", JSON.stringify(appData));
+      }, [appData]);
+
+      const [activeZoneId, setActiveZoneId] = useState("zone-1");
+      const activeZone = useMemo(
+        () => appData.zones.find((z) => z.id === activeZoneId) || appData.zones[0],
+        [appData.zones, activeZoneId]
+      );
+
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const slugParam = params.get("zone");
+        if (slugParam) {
+          const found = appData.zones.find((z) => z.slug === slugParam);
+          if (found) setActiveZoneId(found.id);
+        }
+      }, []);
+
+      // Supabase Config
+      const [showDbModal, setShowDbModal] = useState(false);
+      const [sbUrl, setSbUrl] = useState(() => localStorage.getItem("gz_sb_url") || DEFAULT_SUPABASE_URL);
+      const [sbKey, setSbKey] = useState(() => localStorage.getItem("gz_sb_key") || DEFAULT_SUPABASE_ANON_KEY);
+      const supabaseClient = useMemo(() => {
+        if (sbUrl && sbKey && window.supabase) {
+          try { return window.supabase.createClient(sbUrl, sbKey); } catch (e) { return null; }
+        }
+        return null;
+      }, [sbUrl, sbKey]);
+
+      const [toast, setToast] = useState(null);
+      const notify = (msg, type = "success") => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      // Availability Helpers
+      const getResourceAvailability = (resourceId) => {
+        const unitList = appData.consoles.filter((c) => c.resource_id === resourceId);
+        const total = unitList.length;
+        const operational = unitList.filter((c) => c.status === "available").length;
+        return { total, operational, units: unitList };
+      };
+
+      const getSlotRemaining = (zoneId, resourceId, slotLabel, dateStr) => {
+        const { operational } = getResourceAvailability(resourceId);
+        const bookedQty = appData.bookings
+          .filter(
+            (b) =>
+              b.game_zone_id === zoneId &&
+              b.resource_id === resourceId &&
+              b.slot_label === slotLabel &&
+              b.booking_date === dateStr &&
+              (b.status === "pending" || b.status === "confirmed")
+          )
+          .reduce((sum, b) => sum + Number(b.quantity), 0);
+        return Math.max(0, operational - bookedQty);
+      };
+
+      // Customer Booking State
+      const [selectedDate, setSelectedDate] = useState(todayStr);
+      const zoneResources = appData.resources.filter((r) => r.game_zone_id === activeZone?.id && r.is_active);
+      const zoneSlots = appData.slots.filter((s) => s.game_zone_id === activeZone?.id);
+
+      const [selectedResourceId, setSelectedResourceId] = useState("");
+      useEffect(() => {
+        if (zoneResources.length > 0) setSelectedResourceId(zoneResources[0].id);
+      }, [activeZoneId, appData.resources.length]);
+
+      const [selectedSlotLabel, setSelectedSlotLabel] = useState("");
+      const [bookQty, setBookQty] = useState(1);
+      const [custName, setCustName] = useState("");
+      const [custPhone, setCustPhone] = useState("");
+      const [custNotes, setCustNotes] = useState("");
+      const [searchPhoneOrRef, setSearchPhoneOrRef] = useState("");
+
+      const selectedResource = zoneResources.find((r) => r.id === selectedResourceId);
+      const selectedSlotObj = zoneSlots.find((s) => s.label === selectedSlotLabel);
+      const currentRemaining =
+        selectedResource && selectedSlotLabel
+          ? getSlotRemaining(activeZone.id, selectedResource.id, selectedSlotLabel, selectedDate)
+          : 0;
+
+      const calculatedPrice = useMemo(() => {
+        if (!selectedResource || !selectedSlotObj) return 0;
+        return Math.round(selectedResource.hourly_price * (selectedSlotObj.duration_minutes / 60) * bookQty);
+      }, [selectedResource, selectedSlotObj, bookQty]);
+
+      // Submit Booking (No Screenshot Required)
+      const handleBookingSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedResource || !selectedSlotLabel) return notify("Please select a console and time slot first.", "error");
+        if (currentRemaining < bookQty) return notify("Not enough available units in this slot!", "error");
+        if (!custName.trim() || !custPhone.trim()) return notify("Please enter your name and mobile number.", "error");
+
+        const ref = "BK-" + Math.floor(1000 + Math.random() * 9000);
+        const newBooking = {
+          id: "bk-" + Date.now(),
+          booking_ref: ref,
+          game_zone_id: activeZone.id,
+          resource_id: selectedResource.id,
+          resource_name: selectedResource.name,
+          slot_label: selectedSlotLabel,
+          booking_date: selectedDate,
+          quantity: Number(bookQty),
+          total_amount: calculatedPrice,
+          customer_name: custName,
+          customer_phone: custPhone,
+          customer_notes: custNotes,
+          status: "pending"
+        };
+
+        if (supabaseClient) {
+          await supabaseClient.from("bookings").insert([newBooking]);
+        }
+
+        setAppData((prev) => ({ ...prev, bookings: [newBooking, ...prev.bookings] }));
+        setSearchPhoneOrRef(ref);
+        setCustName("");
+        setCustPhone("");
+        setCustNotes("");
+        notify(`Booking ${ref} submitted! Status: PENDING owner approval.`);
+      };
+
+      // Join Waitlist
+      const handleJoinWaitlist = async () => {
+        if (!custName.trim() || !custPhone.trim()) {
+          return notify("Enter your Name & Mobile Number first, then click Join Waitlist.", "error");
+        }
+        const existingQueue = appData.waitlist.filter(
+          (w) =>
+            w.game_zone_id === activeZone.id &&
+            w.slot_label === selectedSlotLabel &&
+            w.target_date === selectedDate
+        );
+        const nextPos = existingQueue.length + 1;
+        const entry = {
+          id: "wl-" + Date.now(),
+          game_zone_id: activeZone.id,
+          resource_name: selectedResource?.name || "Console",
+          slot_label: selectedSlotLabel,
+          target_date: selectedDate,
+          customer_name: custName,
+          customer_phone: custPhone,
+          queue_position: nextPos,
+          status: "waiting"
+        };
+
+        if (supabaseClient) {
+          await supabaseClient.from("waitlist_entries").insert([entry]);
+        }
+
+        setAppData((prev) => ({ ...prev, waitlist: [...prev.waitlist, entry] }));
+        notify(`Added to Waitlist! You are Position #${nextPos}.`);
+      };
+
+      // Admin State & Actions
+      const [adminTab, setAdminTab] = useState("bookings");
+      const [newResName, setNewResName] = useState("");
+      const [newResCategory, setNewResCategory] = useState("Console");
+      const [newResPrice, setNewResPrice] = useState(150);
+      const [newResQty, setNewResQty] = useState(4);
+      const [newSlotLabel, setNewSlotLabel] = useState("");
+      const [newSlotDuration, setNewSlotDuration] = useState(60);
+
+      const updateBookingStatus = (bookingId, status) => {
+        setAppData((prev) => ({
+          ...prev,
+          bookings: prev.bookings.map((b) => (b.id === bookingId ? { ...b, status } : b))
+        }));
+        notify(`Booking marked as ${status.toUpperCase()}!`);
+      };
+
+      const toggleConsoleStatus = (consoleId) => {
+        const order = ["available", "maintenance", "unavailable"];
+        setAppData((prev) => ({
+          ...prev,
+          consoles: prev.consoles.map((c) => {
+            if (c.id !== consoleId) return c;
+            const nextStatus = order[(order.indexOf(c.status) + 1) % order.length];
+            return { ...c, status: nextStatus };
+          })
+        }));
+        notify("Console unit status updated! Available capacity adjusted automatically.");
+      };
+
+      const handleAddResource = (e) => {
+        e.preventDefault();
+        if (!newResName.trim()) return;
+        const resId = "res-" + Date.now();
+        const newRes = {
+          id: resId,
+          game_zone_id: activeZone.id,
+          name: newResName,
+          category: newResCategory,
+          hourly_price: Number(newResPrice),
+          is_active: true
+        };
+        const newUnits = Array.from({ length: Number(newResQty) }).map((_, idx) => ({
+          id: `c-${Date.now()}-${idx}`,
+          game_zone_id: activeZone.id,
+          resource_id: resId,
+          unit_name: `${newResName.split(" ")[0]} #${idx + 1}`,
+          status: "available"
+        }));
+        setAppData((prev) => ({
+          ...prev,
+          resources: [...prev.resources, newRes],
+          consoles: [...prev.consoles, ...newUnits]
+        }));
+        setNewResName("");
+        notify(`Added ${newResName} with ${newResQty} units!`);
+      };
+
+      const handleAddSlot = (e) => {
+        e.preventDefault();
+        if (!newSlotLabel.trim()) return;
+        const slot = {
+          id: "s-" + Date.now(),
+          game_zone_id: activeZone.id,
+          label: newSlotLabel,
+          duration_minutes: Number(newSlotDuration),
+          is_blocked: false
+        };
+        setAppData((prev) => ({ ...prev, slots: [...prev.slots, slot] }));
+        setNewSlotLabel("");
+        notify(`Added ${newSlotDuration}-min slot: ${newSlotLabel}`);
+      };
+
+      const toggleBlockSlot = (slotId) => {
+        setAppData((prev) => ({
+          ...prev,
+          slots: prev.slots.map((s) => (s.id === slotId ? { ...s, is_blocked: !s.is_blocked } : s))
+        }));
+      };
+
+      // Super Admin State
+      const [newZoneName, setNewZoneName] = useState("");
+      const [newZoneCity, setNewZoneCity] = useState("");
+      const [newZonePhone, setNewZonePhone] = useState("");
+      const [newZoneUpi, setNewZoneUpi] = useState("");
+      const [newZonePlan, setNewZonePlan] = useState("Professional");
+
+      const handleCreateGameZone = (e) => {
+        e.preventDefault();
+        if (!newZoneName.trim() || !newZoneUpi.trim()) return;
+        const slug = newZoneName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        const zoneId = "zone-" + Date.now();
+        const priceMap = { Starter: 799, Professional: 1499, Enterprise: 2999 };
+        const newZone = {
+          id: zoneId,
+          name: newZoneName,
+          slug,
+          description: "Console & PC Gaming Lounge",
+          address: newZoneCity,
+          city: newZoneCity || "Mumbai",
+          mobile_number: newZonePhone || "+91 9876543210",
+          map_link: "https://www.openstreetmap.org",
+          upi_id: newZoneUpi,
+          opening_time: "10:00 AM",
+          closing_time: "11:00 PM",
+          plan_tier: newZonePlan,
+          subscription_price: priceMap[newZonePlan],
+          is_active: true
+        };
+        const defaultResId = "res-" + Date.now();
+        const defaultRes = {
+          id: defaultResId,
+          game_zone_id: zoneId,
+          name: "PlayStation 5",
+          category: "Console",
+          hourly_price: 150,
+          is_active: true
+        };
+        const defaultUnits = [1, 2, 3, 4].map((n) => ({
+          id: `c-${Date.now()}-${n}`,
+          game_zone_id: zoneId,
+          resource_id: defaultResId,
+          unit_name: `PS5 #${n}`,
+          status: "available"
+        }));
+        const defaultSlots = [
+          "04:00 PM - 05:00 PM",
+          "05:00 PM - 06:00 PM",
+          "06:00 PM - 07:00 PM",
+          "07:00 PM - 08:00 PM"
+        ].map((lbl, i) => ({
+          id: `s-${Date.now()}-${i}`,
+          game_zone_id: zoneId,
+          label: lbl,
+          duration_minutes: 60,
+          is_blocked: false
+        }));
+
+        setAppData((prev) => ({
+          ...prev,
+          zones: [...prev.zones, newZone],
+          resources: [...prev.resources, defaultRes],
+          consoles: [...prev.consoles, ...defaultUnits],
+          slots: [...prev.slots, ...defaultSlots]
+        }));
+        setActiveZoneId(zoneId);
+        setNewZoneName("");
+        setNewZoneCity("");
+        setNewZonePhone("");
+        setNewZoneUpi("");
+        notify(`Created "${newZone.name}" with 4 PS5 units!`);
+      };
+
+      const toggleZoneStatus = (zoneId) => {
+        setAppData((prev) => ({
+          ...prev,
+          zones: prev.zones.map((z) => (z.id === zoneId ? { ...z, is_active: !z.is_active } : z))
+        }));
+      };
+
+      // Dynamic QR Codes
+      const upiUri = `upi://pay?pa=${activeZone?.upi_id}&pn=${encodeURIComponent(activeZone?.name || "GameZone")}&am=${calculatedPrice || 150}&cu=INR`;
+      const upiQrImage = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`;
+      const zoneBookingUrl = `${window.location.origin}${window.location.pathname}?zone=${activeZone?.slug}`;
+      const zoneQrImage = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(zoneBookingUrl)}`;
+
+      // Filtered Bookings for Live Customer Tracker
+      const trackedBookings = useMemo(() => {
+        const q = searchPhoneOrRef.trim().toLowerCase();
+        if (!q) return appData.bookings.filter((b) => b.game_zone_id === activeZone?.id).slice(0, 3);
+        return appData.bookings.filter(
+          (b) =>
+            b.game_zone_id === activeZone?.id &&
+            (b.booking_ref.toLowerCase().includes(q) || b.customer_phone.toLowerCase().includes(q))
+        );
+      }, [appData.bookings, activeZone?.id, searchPhoneOrRef]);
+
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+          {/* TOP NAVIGATION BAR */}
+          <header className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
+            <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-extrabold">
+                  GZ
+                </div>
+                <div>
+                  <span className="font-bold text-sm sm:text-base">GameZone Booking SaaS</span>
+                  <div className="text-xs text-slate-400">Shop: <strong className="text-indigo-400">{activeZone?.name}</strong></div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={activeZoneId}
+                  onChange={(e) => setActiveZoneId(e.target.value)}
+                  className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2.5 py-2 font-medium"
+                >
+                  {appData.zones.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      📍 {z.name} ({z.city})
+                    </option>
+                  ))}
+                </select>
+
+                <div className="inline-flex rounded-lg bg-slate-200 dark:bg-slate-800 p-1 text-xs font-bold">
+                  <button
+                    onClick={() => setPortal("customer")}
+                    className={`px-3 py-1.5 rounded-md ${
+                      portal === "customer" ? "bg-indigo-600 text-white" : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    Customer Page
+                  </button>
+                  <button
+                    onClick={() => setPortal("admin")}
+                    className={`px-3 py-1.5 rounded-md ${
+                      portal === "admin" ? "bg-indigo-600 text-white" : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    Shop Admin
+                  </button>
+                  <button
+                    onClick={() => setPortal("superadmin")}
+                    className={`px-3 py-1.5 rounded-md ${
+                      portal === "superadmin" ? "bg-indigo-600 text-white" : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    Super Admin
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowDbModal(true)}
+                  className="text-xs px-2.5 py-2 rounded-lg border border-indigo-500/40 bg-indigo-500/10 text-indigo-400 font-medium"
+                >
+                  ⚙️ DB
+                </button>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className="text-xs px-2.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
+                >
+                  {darkMode ? "☀️" : "🌙"}
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* TOAST MESSAGE */}
+          {toast && (
+            <div className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-xl bg-indigo-600 text-white text-sm font-bold">
+              {toast.msg}
+            </div>
+          )}
+
+          {/* ====================================================================
+              1. CUSTOMER BOOKING PAGE (SIMPLE & CLEAN)
+             ==================================================================== */}
+          {portal === "customer" && activeZone && (
+            <main className="max-w-5xl mx-auto px-4 py-6">
+              {!activeZone.is_active ? (
+                <div className="p-10 text-center rounded-2xl bg-red-500/10 border border-red-500/30">
+                  <h2 className="text-xl font-bold text-red-400">This Game Zone Is Currently Closed</h2>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left 2 Columns: 3 Easy Steps */}
+                  <div className="lg:col-span-2 space-y-5">
+                    {/* Shop Header */}
+                    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <h1 className="text-2xl font-extrabold">{activeZone.name}</h1>
+                        <p className="text-xs text-slate-400 mt-1">
+                          📍 {activeZone.address}, {activeZone.city} • 🕒 {activeZone.opening_time} - {activeZone.closing_time}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={`tel:${activeZone.mobile_number}`}
+                          className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                        >
+                          📞 Call Shop ({activeZone.mobile_number})
+                        </a>
+                        <a
+                          href={activeZone.map_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold"
+                        >
+                          🗺️ Map
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Step 1: Date & Console */}
+                    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-base font-bold">Step 1: Select Date & Console</h2>
+                        <input
+                          type="date"
+                          value={selectedDate}
+                          min={todayStr}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 text-sm font-bold"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {zoneResources.map((res) => {
+                          const { total, operational } = getResourceAvailability(res.id);
+                          const isSelected = selectedResourceId === res.id;
+                          return (
+                            <div
+                              key={res.id}
+                              onClick={() => {
+                                setSelectedResourceId(res.id);
+                                setBookQty(1);
+                              }}
+                              className={`cursor-pointer p-3.5 rounded-xl border transition ${
+                                isSelected
+                                  ? "border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30"
+                                  : "border-slate-200 dark:border-slate-800"
+                              }`}
+                            >
+                              <div className="font-bold text-sm">{res.name}</div>
+                              <div className="text-indigo-400 font-extrabold text-sm mt-1">₹{res.hourly_price} / hr</div>
+                              <div className="text-[11px] text-slate-400 mt-2">
+                                {operational} of {total} Working
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Step 2: Time Slot */}
+                    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                      <h2 className="text-base font-bold">Step 2: Pick a Time Slot</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {zoneSlots.map((slot) => {
+                          const rem = selectedResource
+                            ? getSlotRemaining(activeZone.id, selectedResource.id, slot.label, selectedDate)
+                            : 0;
+                          const isSelected = selectedSlotLabel === slot.label;
+
+                          return (
+                            <button
+                              type="button"
+                              key={slot.id}
+                              disabled={slot.is_blocked}
+                              onClick={() => {
+                                setSelectedSlotLabel(slot.label);
+                                if (rem > 0 && bookQty > rem) setBookQty(rem);
+                              }}
+                              className={`p-3 rounded-xl border text-left flex items-center justify-between transition ${
+                                slot.is_blocked
+                                  ? "opacity-40 cursor-not-allowed border-red-500/30"
+                                  : isSelected
+                                  ? "border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30"
+                                  : "border-slate-200 dark:border-slate-800"
+                              }`}
+                            >
+                              <div>
+                                <div className="font-bold text-xs sm:text-sm">{slot.label}</div>
+                                <div className="text-[11px] text-slate-400">{slot.duration_minutes} Mins</div>
+                              </div>
+                              {slot.is_blocked ? (
+                                <span className="text-[10px] px-2 py-1 rounded bg-red-500/20 text-red-400 font-bold">
+                                  BLOCKED
+                                </span>
+                              ) : rem === 0 ? (
+                                <span className="text-[10px] px-2 py-1 rounded bg-rose-500/20 text-rose-400 font-bold">
+                                  FULL
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                                  {rem} Available
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Step 3: Enter Name & Book */}
+                    <form
+                      onSubmit={handleBookingSubmit}
+                      className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4"
+                    >
+                      <h2 className="text-base font-bold">Step 3: Enter Your Details</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">
+                            How Many Consoles? (Max {Math.max(1, currentRemaining)})
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max={Math.max(1, currentRemaining)}
+                            value={bookQty}
+                            onChange={(e) => setBookQty(Math.min(Math.max(1, Number(e.target.value)), Math.max(1, currentRemaining)))}
+                            className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-sm font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Your Name *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Rahul Sharma"
+                            value={custName}
+                            onChange={(e) => setCustName(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Mobile Number *</label>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="9876543210"
+                            value={custPhone}
+                            onChange={(e) => setCustPhone(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <input
+                        type="text"
+                        placeholder="Optional Notes (e.g. FIFA / Tekken 8)"
+                        value={custNotes}
+                        onChange={(e) => setCustNotes(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-sm"
+                      />
+
+                      {selectedSlotLabel && currentRemaining === 0 ? (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                          <div className="text-xs">
+                            <strong className="text-amber-400 block">Slot is Full!</strong>
+                            Join the waitlist to get priority if a player cancels.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleJoinWaitlist}
+                            className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs"
+                          >
+                            Join Waitlist
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="submit"
+                          className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm shadow-lg"
+                        >
+                          Confirm & Submit Booking (₹{calculatedPrice})
+                        </button>
+                      )}
+                    </form>
+                  </div>
+
+                  {/* Right Column: Simple UPI QR + Live Booking Status Tracker */}
+                  <div className="space-y-5">
+                    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 text-center">
+                      <h3 className="text-base font-bold">Pay via UPI</h3>
+                      <p className="text-xs text-slate-400">
+                        Scan QR to pay the shop owner directly, then submit your booking.
+                      </p>
+                      <div className="p-3 bg-white rounded-xl inline-block border">
+                        <img src={upiQrImage} alt="UPI QR" className="w-40 h-40 mx-auto" />
+                      </div>
+                      <div className="text-sm font-extrabold text-indigo-400">
+                        Amount: ₹{calculatedPrice || 150}
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs flex items-center justify-between">
+                        <span className="text-slate-400">UPI ID:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(activeZone.upi_id);
+                            notify("UPI ID Copied!");
+                          }}
+                          className="font-mono font-bold text-indigo-400 hover:underline"
+                        >
+                          {activeZone.upi_id} (Copy)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Built-in Live Booking Status Tracker */}
+                    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                      <h3 className="text-sm font-bold">Live Booking Status Tracker</h3>
+                      <input
+                        type="text"
+                        placeholder="Search by Phone or Ref (e.g. BK-9044)"
+                        value={searchPhoneOrRef}
+                        onChange={(e) => setSearchPhoneOrRef(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-xs"
+                      />
+                      <div className="space-y-2">
+                        {trackedBookings.map((b) => (
+                          <div
+                            key={b.id}
+                            className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between"
+                          >
+                            <div>
+                              <div className="font-bold">{b.booking_ref} • {b.customer_name}</div>
+                              <div className="text-slate-400">{b.resource_name} (x{b.quantity}) • {b.slot_label}</div>
+                            </div>
+                            <span
+                              className={`px-2 py-1 rounded-full font-bold uppercase text-[10px] ${
+                                b.status === "confirmed"
+                                  ? "bg-emerald-500/20 text-emerald-400"
+                                  : b.status === "pending"
+                                  ? "bg-amber-500/20 text-amber-400"
+                                  : "bg-red-500/20 text-red-400"
+                              }`}
+                            >
+                              {b.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+          )}
+
+          {/* ====================================================================
+              2. SHOP ADMIN DASHBOARD
+             ==================================================================== */}
+          {portal === "admin" && activeZone && (
+            <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+                <div>
+                  <h1 className="text-xl font-extrabold">{activeZone.name} — Shop Admin</h1>
+                  <p className="text-xs text-slate-400">One-click booking approvals & console maintenance</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: "bookings", label: "📋 Bookings" },
+                    { id: "consoles", label: "🎮 Consoles & Maintenance" },
+                    { id: "slots", label: "⏰ Time Slots" },
+                    { id: "waitlist", label: "⏳ Waitlist" },
+                    { id: "qr", label: "📱 Shop QR & UPI" }
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setAdminTab(t.id)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                        adminTab === t.id
+                          ? "bg-indigo-600 text-white"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-300"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {adminTab === "bookings" && (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <div className="text-xs text-slate-400">Total Bookings</div>
+                      <div className="text-2xl font-extrabold mt-1">
+                        {appData.bookings.filter((b) => b.game_zone_id === activeZone.id).length}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <div className="text-xs text-amber-400 font-bold">Pending Approval</div>
+                      <div className="text-2xl font-extrabold mt-1 text-amber-400">
+                        {appData.bookings.filter((b) => b.game_zone_id === activeZone.id && b.status === "pending").length}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <div className="text-xs text-emerald-400 font-bold">Confirmed Revenue</div>
+                      <div className="text-2xl font-extrabold mt-1 text-emerald-400">
+                        ₹
+                        {appData.bookings
+                          .filter((b) => b.game_zone_id === activeZone.id && (b.status === "confirmed" || b.status === "completed"))
+                          .reduce((s, b) => s + Number(b.total_amount), 0)}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <div className="text-xs text-slate-400">Waitlist Queue</div>
+                      <div className="text-2xl font-extrabold mt-1">
+                        {appData.waitlist.filter((w) => w.game_zone_id === activeZone.id).length}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <h2 className="text-base font-bold mb-3">All Booking Requests</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400">
+                            <th className="py-2.5 px-2">Ref / Date</th>
+                            <th className="py-2.5 px-2">Player</th>
+                            <th className="py-2.5 px-2">Console & Slot</th>
+                            <th className="py-2.5 px-2">Amount</th>
+                            <th className="py-2.5 px-2">Status</th>
+                            <th className="py-2.5 px-2">1-Click Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                          {appData.bookings
+                            .filter((b) => b.game_zone_id === activeZone.id)
+                            .map((b) => (
+                              <tr key={b.id}>
+                                <td className="py-3 px-2 font-bold">
+                                  {b.booking_ref}
+                                  <div className="text-slate-400 font-normal">{b.booking_date}</div>
+                                </td>
+                                <td className="py-3 px-2">
+                                  <div className="font-bold">{b.customer_name}</div>
+                                  <a href={`tel:${b.customer_phone}`} className="text-indigo-400 hover:underline">
+                                    📞 {b.customer_phone}
+                                  </a>
+                                </td>
+                                <td className="py-3 px-2">
+                                  <div className="font-semibold">{b.resource_name} (x{b.quantity})</div>
+                                  <div className="text-slate-400">{b.slot_label}</div>
+                                </td>
+                                <td className="py-3 px-2 font-bold">₹{b.total_amount}</td>
+                                <td className="py-3 px-2">
+                                  <span
+                                    className={`px-2 py-1 rounded-full font-bold uppercase text-[10px] ${
+                                      b.status === "confirmed"
+                                        ? "bg-emerald-500/20 text-emerald-400"
+                                        : b.status === "pending"
+                                        ? "bg-amber-500/20 text-amber-400"
+                                        : "bg-red-500/20 text-red-400"
+                                    }`}
+                                  >
+                                    {b.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-2 space-x-1.5">
+                                  <button
+                                    onClick={() => updateBookingStatus(b.id, "confirmed")}
+                                    className="px-2.5 py-1 rounded bg-emerald-600 text-white font-bold"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => updateBookingStatus(b.id, "rejected")}
+                                    className="px-2.5 py-1 rounded bg-rose-600 text-white font-bold"
+                                  >
+                                    Reject
+                                  </button>
+                                  <button
+                                    onClick={() => updateBookingStatus(b.id, "completed")}
+                                    className="px-2.5 py-1 rounded bg-slate-700 text-white font-bold"
+                                  >
+                                    Done
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {adminTab === "consoles" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                    <h2 className="text-base font-bold">Console Maintenance Toggles</h2>
+                    <p className="text-xs text-slate-400">
+                      Tap any console to switch between <strong>Available → Maintenance → Unavailable</strong>.
+                    </p>
+                    {zoneResources.map((res) => {
+                      const { total, operational, units } = getResourceAvailability(res.id);
+                      return (
+                        <div key={res.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+                          <div className="font-bold text-sm">
+                            {res.name} (₹{res.hourly_price}/hr) — {operational} of {total} Available
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {units.map((u) => (
+                              <button
+                                key={u.id}
+                                onClick={() => toggleConsoleStatus(u.id)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                  u.status === "available"
+                                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                                    : u.status === "maintenance"
+                                    ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+                                    : "bg-rose-500/15 border-rose-500/40 text-rose-400"
+                                }`}
+                              >
+                                {u.unit_name}: {u.status.toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <form
+                    onSubmit={handleAddResource}
+                    className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 h-fit"
+                  >
+                    <h3 className="text-base font-bold">Add Console / PC Type</h3>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Name (e.g. Xbox Series X)"
+                      value={newResName}
+                      onChange={(e) => setNewResName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Qty"
+                        value={newResQty}
+                        onChange={(e) => setNewResQty(e.target.value)}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                      />
+                      <input
+                        type="number"
+                        min="10"
+                        placeholder="Price/hr"
+                        value={newResPrice}
+                        onChange={(e) => setNewResPrice(e.target.value)}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <button type="submit" className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs">
+                      + Add Resource
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {adminTab === "slots" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                    <h2 className="text-base font-bold">Manage Time Slots</h2>
+                    {zoneSlots.map((s) => (
+                      <div
+                        key={s.id}
+                        className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
+                      >
+                        <div className="text-xs font-bold">
+                          {s.label} ({s.duration_minutes} mins)
+                        </div>
+                        <button
+                          onClick={() => toggleBlockSlot(s.id)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                            s.is_blocked ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+                          }`}
+                        >
+                          {s.is_blocked ? "Unblock" : "Block Slot"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <form
+                    onSubmit={handleAddSlot}
+                    className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 h-fit"
+                  >
+                    <h3 className="text-base font-bold">Add Slot</h3>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 09:00 PM - 10:00 PM"
+                      value={newSlotLabel}
+                      onChange={(e) => setNewSlotLabel(e.target.value)}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                    />
+                    <select
+                      value={newSlotDuration}
+                      onChange={(e) => setNewSlotDuration(e.target.value)}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                    >
+                      <option value={30}>30 Minutes</option>
+                      <option value={60}>60 Minutes</option>
+                      <option value={90}>90 Minutes</option>
+                      <option value={120}>120 Minutes</option>
+                    </select>
+                    <button type="submit" className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs">
+                      + Create Slot
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {adminTab === "waitlist" && (
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <h2 className="text-base font-bold">Customer Waitlist Queue</h2>
+                  {appData.waitlist
+                    .filter((w) => w.game_zone_id === activeZone.id)
+                    .map((w) => (
+                      <div
+                        key={w.id}
+                        className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
+                      >
+                        <div className="text-xs">
+                          <span className="font-bold text-amber-400">Position #{w.queue_position}</span> —{" "}
+                          <strong>{w.customer_name}</strong> ({w.resource_name} • {w.slot_label})
+                        </div>
+                        <a
+                          href={`tel:${w.customer_phone}`}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold"
+                        >
+                          📞 Call {w.customer_phone}
+                        </a>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {adminTab === "qr" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-3">
+                    <h3 className="text-base font-bold">Printable Shop Booking QR Code</h3>
+                    <div className="p-3 bg-white rounded-xl inline-block border">
+                      <img src={zoneQrImage} alt="Shop QR" className="w-40 h-40" />
+                    </div>
+                    <div className="text-xs text-indigo-400 break-all">{zoneBookingUrl}</div>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                    <h3 className="text-base font-bold">Shop UPI & Phone Settings</h3>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Owner UPI ID</label>
+                      <input
+                        type="text"
+                        value={activeZone.upi_id}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAppData((prev) => ({
+                            ...prev,
+                            zones: prev.zones.map((z) => (z.id === activeZone.id ? { ...z, upi_id: val } : z))
+                          }));
+                        }}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Shop Mobile Number</label>
+                      <input
+                        type="text"
+                        value={activeZone.mobile_number}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAppData((prev) => ({
+                            ...prev,
+                            zones: prev.zones.map((z) => (z.id === activeZone.id ? { ...z, mobile_number: val } : z))
+                          }));
+                        }}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+          )}
+
+          {/* ====================================================================
+              3. SUPER ADMIN PANEL
+             ==================================================================== */}
+          {portal === "superadmin" && (
+            <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+              <h1 className="text-xl font-extrabold">Super Admin — All Game Zones</h1>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <h2 className="text-base font-bold">Registered Game Zones ({appData.zones.length})</h2>
+                  {appData.zones.map((z) => (
+                    <div
+                      key={z.id}
+                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="font-bold text-sm">
+                          {z.name} ({z.city})
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          UPI: {z.upi_id} • Plan: {z.plan_tier} (₹{z.subscription_price}/mo)
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setActiveZoneId(z.id);
+                            setPortal("admin");
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold"
+                        >
+                          Open Admin
+                        </button>
+                        <button
+                          onClick={() => toggleZoneStatus(z.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                            z.is_active ? "bg-rose-600 text-white" : "bg-emerald-600 text-white"
+                          }`}
+                        >
+                          {z.is_active ? "Suspend" : "Activate"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <form
+                  onSubmit={handleCreateGameZone}
+                  className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 h-fit"
+                >
+                  <h3 className="text-base font-bold">Add New Game Zone</h3>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Game Zone Name"
+                    value={newZoneName}
+                    onChange={(e) => setNewZoneName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    required
+                    placeholder="City (e.g. Vasai West)"
+                    value={newZoneCity}
+                    onChange={(e) => setNewZoneCity(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Owner Mobile Number"
+                    value={newZonePhone}
+                    onChange={(e) => setNewZonePhone(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Owner UPI ID (e.g. shop@okaxis)"
+                    value={newZoneUpi}
+                    onChange={(e) => setNewZoneUpi(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+                  />
+                  <button type="submit" className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs">
+                    + Create Game Zone
+                  </button>
+                </form>
+              </div>
+            </main>
+          )}
+
+          {/* SUPABASE DB CONFIG MODAL */}
+          {showDbModal && (
+            <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-base">Supabase Database Connection</h3>
+                  <button onClick={() => setShowDbModal(false)}>✕</button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Supabase Project URL"
+                  value={sbUrl}
+                  onChange={(e) => setSbUrl(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs"
+                />
+                <input
+                  type="password"
+                  placeholder="Supabase Anon Public Key"
+                  value={sbKey}
+                  onChange={(e) => setSbKey(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs"
+                />
+                <button
+                  onClick={() => {
+                    localStorage.setItem("gz_sb_url", sbUrl);
+                    localStorage.setItem("gz_sb_key", sbKey);
+                    setShowDbModal(false);
+                    notify("Database Connected!");
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs"
+                >
+                  Save & Connect
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
